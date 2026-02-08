@@ -1,0 +1,9 @@
+// main function
+fn main() {    // many spaces here
+    /*
+        multiline
+        comment
+    */
+    let x    =     10;   // value
+    println!("x = {}", x);
+}

@@ -1,7 +1,13 @@
 package spl
 
-import "fmt"
+import "github.com/MDx3R/spl/internal/cleaner"
 
-func Run() {
-	fmt.Println("Simple Programming Language")
+type App struct {
+	Cleaner cleaner.Cleaner
+}
+
+func NewApp() *App {
+	return &App{
+		Cleaner: cleaner.NewCleaner(),
+	}
 }
