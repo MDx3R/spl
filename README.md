@@ -1,1 +1,1 @@
-# spl
+# Simple Programming Language
