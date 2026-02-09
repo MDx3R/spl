@@ -1,4 +1,14 @@
 // main function
+//! docs comment
+/// alternative docs comment
+/*!
+    multiline
+    docs comment
+*/
+/**
+    alternative multiline
+    docs comment
+*/
 fn main() {    // many spaces here
     /*
         multiline

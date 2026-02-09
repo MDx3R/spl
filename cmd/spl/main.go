@@ -22,7 +22,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	cleaned := app.Cleaner.Clean(string(data))
+	cleaned, warnings, err := app.Cleaner.Clean(string(data))
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Println(cleaned)
+
+	for _, w := range warnings {
+		fmt.Printf("%s\n", w)
+	}
 }

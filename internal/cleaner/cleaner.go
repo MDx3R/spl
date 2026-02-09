@@ -6,7 +6,7 @@ import (
 )
 
 type Cleaner interface {
-	Clean(string) string
+	Clean(string) (string, []string, error)
 }
 
 type RegexCleaner struct {
@@ -14,30 +14,46 @@ type RegexCleaner struct {
 	reLineComments  *regexp.Regexp
 	reSpaces        *regexp.Regexp
 	reEmptyLines    *regexp.Regexp
+	reInvalidChars  *regexp.Regexp
 }
 
 func NewCleaner() *RegexCleaner {
 	return &RegexCleaner{
 		// "/* ... */" note this regex does not support nesting
 		// idk how to support nested comments with regex
-		reBlockComments: regexp.MustCompile(`(?s)/\*.*?\*/`),
+		reBlockComments: regexp.MustCompile(`(?s)/\*[^\*!].*?\*/`),
 
 		// "//" comments to end of line
-		reLineComments: regexp.MustCompile(`//.*`),
+		// excluding "///" and "//!" as they are used by compiler
+		reLineComments: regexp.MustCompile(`(^|[^/])//[^/!].*`),
 
 		// one or more spaces / tabs
 		reSpaces: regexp.MustCompile(`[ \t]+`),
 
 		// empty lines and lines with trailing spaces
 		reEmptyLines: regexp.MustCompile(`(?m)^\s*\n`),
+
+		// all invalid chars
+		reInvalidChars: regexp.MustCompile(`[^\p{L}\p{N}\p{P}\p{S}\s]`),
 	}
 }
 
-func (c *RegexCleaner) Clean(input string) string {
+func (c *RegexCleaner) Clean(input string) (string, []string, error) {
 	out := input
+	var warnings []string
+
+	// 0. Check for invalid characters
+	if loc := c.reInvalidChars.FindStringIndex(out); loc != nil {
+		return "", warnings, &InvalidCharError{Position: loc[0], Char: rune(out[loc[0]])}
+	}
 
 	// 1. Remove block comments
 	out = c.reBlockComments.ReplaceAllString(out, "")
+	blockOpenCount := strings.Count(out, "/*")
+	blockCloseCount := strings.Count(out, "*/")
+	if blockOpenCount != blockCloseCount {
+		warnings = append(warnings, "Warning: unmatched /* block comment")
+	}
 
 	// 2. Remove line comments
 	out = c.reLineComments.ReplaceAllString(out, "")
@@ -54,5 +70,5 @@ func (c *RegexCleaner) Clean(input string) string {
 	// 4. Remove empty lines
 	out = c.reEmptyLines.ReplaceAllString(out, "")
 
-	return strings.TrimSpace(out)
+	return strings.TrimSpace(out), warnings, nil
 }
