@@ -1,0 +1,16 @@
+// Should warn
+fn main() {
+    // This is a standard one-line comment
+    let mut x = 10;
+    let emoji = "emoji";
+
+    /*
+        This is a standard multi-line comment.
+        It is ignored by the documentation generator.
+
+    // Here
+
+    // Assigning a new value
+    x = 20;
+    println!("New value of x = {}", x);
+}

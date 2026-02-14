@@ -1,0 +1,10 @@
+// Should fail
+fn main() {
+    // This is a standard one-line comment
+    let mut x = 10;
+    let emoji = ✈️; // here
+
+    // Assigning a new value
+    x = 20;
+    println!("New value of x = {}", x);
+}

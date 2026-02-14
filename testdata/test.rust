@@ -1,19 +1,74 @@
-// main function
-//! docs comment
-/// alternative docs comment
+//! Inner doc comment (module level)
 /*!
-    multiline
-    docs comment
-*/
-/**
-    alternative multiline
-    docs comment
-*/
-fn main() {    // many spaces here
-    /*
-        multiline
-        comment
+    This is a nested multi-line inner doc comment.
+    /*! 
+        You can put another inner doc comment inside!
     */
-    let x    =     10;   // value
-    println!("x = {}", x);
+    It still documents the module.
+!*/
+
+/// Outer doc comment (function level)
+/**
+    This is a nested multi-line outer doc comment.
+    /**
+        Nested outer doc comment for the item below.
+    **/
+    Useful for temporarily "commenting out" documented code.
+**/
+fn main() {
+    // This is a standard one-line comment
+    let mut x = 10;
+    let emoji = "emoji"; // This is valid
+
+    /*
+        This is a standard multi-line comment.
+    */
+
+    // Arithmetic operations
+    let y = 5;
+    let sum = x + y;
+    let difference = x - y;
+    let product = x * y;
+    let division = x / y;
+
+    println!("sum = {}, difference = {}, product = {}, division = {}", 
+             sum, difference, product, division);
+
+    // Logical expression
+    let is_greater = x > y && y > 0;
+    println!("Is x greater than y and y > 0? {}", is_greater);
+
+    // Conditional if-else operator
+    if is_greater {
+        println!("x is greater than y");
+    } else {
+        println!("x is NOT greater than y");
+    }
+
+    // For loop
+    println!("For loop:");
+    for i in 0..5 {
+        println!("i = {}", i);
+    }
+
+    // While loop
+    println!("While loop:");
+    let mut counter = 0;
+    while counter < 3 {
+        println!("counter = {}", counter);
+        counter += 1;
+    }
+
+    // Function call
+    let factorial_result = factorial(5);
+    println!("Factorial of 5 = {}", factorial_result);
+
+    let even_check = is_even(x);
+    println!("Is x even? {}", even_check);
+
+    println!("\"x\" = {}, \"emoji\" = {}", x, emoji);
+
+    // Assigning a new value
+    x = 20;
+    println!("New value of x = {}", x);
 }

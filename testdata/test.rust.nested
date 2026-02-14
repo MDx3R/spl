@@ -1,0 +1,19 @@
+// Should warn
+fn main() {
+    // This is a standard one-line comment
+    let mut x = 10;
+    let emoji = "emoji"; // This is valid
+
+    /*
+        This is a standard multi-line comment.
+        /*
+            Rust allows you to nest these! 
+            This makes it easy to comment out large blocks 
+            of code that already contain multi-line comments.
+        */
+        Back in the first level of the block comment.
+    */
+
+    x = 20;
+    println!("New value of x = {}", x);
+}
