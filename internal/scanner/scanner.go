@@ -26,7 +26,8 @@ func NewScanner(src io.Reader) *Scanner {
 	s.errh = func(line, col uint, msg string) {
 		fmt.Fprintf(os.Stderr, "%d:%d: %s\n", line, col, msg)
 	}
-	s.consume()
+	// TODO: uncomment when scanner client (parser) is implemented
+	// s.consume()
 	return s
 }
 
@@ -50,7 +51,7 @@ func (s *Scanner) Next() Token {
 
 		curr := s.current()
 
-		if s.atIdentChar(curr, true) {
+		if s.isIdentStart(curr) {
 			return s.ident()
 		}
 		if s.isDigit(curr) {
@@ -114,10 +115,18 @@ func (s *Scanner) Next() Token {
 			return s.stdString()
 		case '/':
 			if s.match('/') {
-				return s.lineComment()
+				tok := s.lineComment()
+				if tok.Kind == LineComment {
+					continue
+				}
+				return tok
 			}
 			if s.match('*') {
-				return s.blockComment()
+				tok := s.blockComment()
+				if tok.Kind == BlockComment {
+					continue
+				}
+				return tok
 			}
 			return s.switchOp(Slash, SlashEq)
 		default:
@@ -182,13 +191,9 @@ func (s *Scanner) lineComment() Token {
 	}
 
 	var sb strings.Builder
-	for !s.isAtEnd() && s.current() != '\n' {
+	for !s.atLineEnd() {
 		sb.WriteRune(s.current())
 		s.consume()
-	}
-
-	if kind == LineComment {
-		return s.Next()
 	}
 
 	return s.newLiteralToken(kind, sb.String())
@@ -208,7 +213,7 @@ func (s *Scanner) blockComment() Token {
 		case '/':
 			// "/**/" — empty plain block comment
 			s.consume()
-			return s.Next()
+			return s.newLiteralToken(BlockComment, "")
 		case '*':
 			// "/***/..." — plain comment (third '*' means not outer doc)
 			// no need to consume the third '*'
@@ -233,20 +238,18 @@ func (s *Scanner) blockComment() Token {
 		if ch == '/' && s.current() == '*' {
 			s.consume()
 			depth++
+			// open nested block comment
 			sb.WriteString("/*")
 		} else if ch == '*' && s.current() == '/' {
 			s.consume()
 			depth--
+			// close nested block comment
 			if depth > 0 {
 				sb.WriteString("*/")
 			}
 		} else {
 			sb.WriteRune(ch)
 		}
-	}
-
-	if kind == BlockComment {
-		return s.Next()
 	}
 
 	return s.newLiteralToken(kind, sb.String())
@@ -256,18 +259,19 @@ func (s *Scanner) blockComment() Token {
 func (s *Scanner) stdString() Token {
 	var sb strings.Builder
 	for {
-		if s.isAtEnd() || s.current() == '\n' {
+		if s.atLineEnd() {
 			s.errorf("unterminated string literal")
 			break
 		}
-		if s.current() == '"' {
+
+		switch s.current() {
+		case '"':
 			s.consume()
-			break
-		}
-		if s.current() == '\\' {
+			return s.newLiteralToken(StrLit, sb.String())
+		case '\\':
 			s.consume()
 			sb.WriteRune(s.readEscape())
-		} else {
+		default:
 			sb.WriteRune(s.current())
 			s.consume()
 		}
@@ -278,7 +282,7 @@ func (s *Scanner) stdString() Token {
 
 // stdChar is called after the opening '\” has been consumed.
 func (s *Scanner) stdChar() Token {
-	if s.isAtEnd() || s.current() == '\n' {
+	if s.atLineEnd() {
 		s.errorf("unterminated char literal")
 		return s.newToken(CharLit)
 	}
@@ -298,19 +302,20 @@ func (s *Scanner) stdChar() Token {
 		s.consume()
 	}
 
-	if s.isAtEnd() || s.current() == '\n' {
+	switch {
+	case s.current() == '\'':
+		s.consume()
+	case s.atLineEnd():
 		s.errorf("unterminated char literal")
-	} else if s.current() != '\'' {
+	default:
 		s.errorf("char literal contains more than one character")
 		// consuming the rest of the invalid char literal
-		for !s.isAtEnd() && s.current() != '\'' && s.current() != '\n' {
+		for !s.atLineEnd() && s.current() != '\'' {
 			s.consume()
 		}
 		if s.current() == '\'' {
 			s.consume()
 		}
-	} else {
-		s.consume()
 	}
 
 	return s.newLiteralToken(CharLit, string(ch))
@@ -357,7 +362,7 @@ func (s *Scanner) number() Token {
 	case '.':
 		// Peek at the character after '.'. If it's a digit, this is a float;
 		// otherwise treat as IntLit + Dot (preserves "0..5" range syntax).
-		if r, ok := s.peek(); ok && r >= '0' && r <= '9' {
+		if r := s.peek(); r >= '0' && r <= '9' {
 			isFloat = true
 			sb.WriteRune('.')
 			s.consume()
@@ -384,6 +389,7 @@ func (s *Scanner) collectExponent(sb *strings.Builder) {
 	if s.current() != 'e' && s.current() != 'E' {
 		return
 	}
+
 	sb.WriteRune(s.current())
 	s.consume()
 	if s.current() == '+' || s.current() == '-' {
@@ -394,6 +400,7 @@ func (s *Scanner) collectExponent(sb *strings.Builder) {
 		s.errorf("expected digit in float exponent")
 		return
 	}
+
 	for s.isDigit(s.current()) {
 		sb.WriteRune(s.current())
 		s.consume()
@@ -402,7 +409,7 @@ func (s *Scanner) collectExponent(sb *strings.Builder) {
 
 func (s *Scanner) ident() Token {
 	var sb strings.Builder
-	for s.atIdentChar(s.current(), false) {
+	for s.isIdentCont(s.current()) {
 		sb.WriteRune(s.current())
 		s.consume()
 	}
@@ -429,14 +436,12 @@ func (s *Scanner) isAlpha(ch rune) bool {
 
 func (s *Scanner) isDigit(ch rune) bool { return '0' <= ch && ch <= '9' }
 
-func (s *Scanner) atIdentChar(ch rune, first bool) bool {
-	if s.isAlpha(ch) || ch == '_' {
-		return true
-	}
-	if s.isDigit(ch) {
-		return !first
-	}
-	return false
+func (s *Scanner) isIdentCont(ch rune) bool {
+	return s.isAlpha(ch) || s.isDigit(ch) || ch == '_'
+}
+
+func (s *Scanner) isIdentStart(ch rune) bool {
+	return s.isAlpha(ch) || ch == '_'
 }
 
 func (s *Scanner) newToken(kind TokenKind) Token {
@@ -449,20 +454,21 @@ func (s *Scanner) newLiteralToken(kind TokenKind, lit string) Token {
 	return tok
 }
 
-func (s *Scanner) isAtEnd() bool { return s.ch == -1 }
+func (s *Scanner) atLineEnd() bool { return s.current() == '\n' || s.isAtEnd() }
+func (s *Scanner) isAtEnd() bool   { return s.ch == -1 }
 
 // current returns the rune currently under the scanner cursor (already read
 // from the underlying reader). Returns -1 when the input is exhausted.
 func (s *Scanner) current() rune { return s.ch }
 
 // peek returns the next rune in the input without consuming it, i.e. the rune
-// that will become current() after the next consume(). Returns (r, true) on
-// success, or (0, false) when the buffer holds no further data.
-func (s *Scanner) peek() (rune, bool) {
+// that will become current() after the next consume(). Returns r on
+// success, or -1 when the buffer holds no further data.
+func (s *Scanner) peek() rune {
 	p, _ := s.buf.Peek(utf8.UTFMax)
 	if len(p) == 0 {
-		return 0, false
+		return -1
 	}
 	r, _ := utf8.DecodeRune(p)
-	return r, true
+	return r
 }
