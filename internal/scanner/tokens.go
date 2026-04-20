@@ -5,7 +5,7 @@ type TokenKind uint
 const (
 	EOF TokenKind = iota
 
-	// comments
+	// Comments
 	LineComment
 	BlockComment
 	OuterLineDoc
@@ -13,71 +13,74 @@ const (
 	OuterBlockDoc
 	InnerBlockDoc
 
-	// names and literals
+	// Identifiers and literals
 	Name
 	IntLit
 	FloatLit
 	StrLit
 	CharLit
 
-	// delimiters
+	// Delimiters
 	Lparen
 	Rparen
 	Lbrace
 	Rbrace
 	Lbrack
 	Rbrack
-	ThinArrow
-	ThickArrow
+
+	// Structural symbols
 	Comma
+	Semi
+	Colon
 	Dot
 	DotDot
 	DotDotEq
-	Semi
-	Colon
+	ThinArrow
+	ThickArrow
 	Pound
 	Question
 
-	// operators
+	// Assignment operators
 	Eq
+	MinusEq
+	PlusEq
+	StarEq
+	SlashEq
+	PercentEq
+	AndEq
+	OrEq
+	CaretEq
+	ShlEq
+	ShrEq
+
+	// Comparison operators
 	EqEq
+	NotEq
 	Lt
 	LtEq
 	Gt
 	GtEq
-	Not
-	NotEq
 
+	// Arithmetic operators
 	Minus
 	Plus
 	Star
 	Slash
 	Percent
 
+	// Bitwise operators
 	And
-	AndAnd
 	Or
-	OrOr
 	Caret
-
 	Shl
 	Shr
 
-	// assignments
-	MinusEq
-	PlusEq
-	StarEq
-	SlashEq
-	PercentEq
+	// Logical operators
+	Not
+	AndAnd
+	OrOr
 
-	AndEq
-	OrEq
-	CaretEq
-
-	ShlEq
-	ShrEq
-
-	// keywords
+	// Keywords
 	Break
 	Const
 	Continue
@@ -131,36 +134,17 @@ var tokenKindNames = [...]string{
 	Rbrace:        "}",
 	Lbrack:        "[",
 	Rbrack:        "]",
-	ThinArrow:     "->",
-	ThickArrow:    "=>",
 	Comma:         ",",
+	Semi:          ";",
+	Colon:         ":",
 	Dot:           ".",
 	DotDot:        "..",
 	DotDotEq:      "..=",
-	Semi:          ";",
-	Colon:         ":",
+	ThinArrow:     "->",
+	ThickArrow:    "=>",
 	Pound:         "#",
 	Question:      "?",
 	Eq:            "=",
-	EqEq:          "==",
-	Lt:            "<",
-	LtEq:          "<=",
-	Gt:            ">",
-	GtEq:          ">=",
-	Not:           "!",
-	NotEq:         "!=",
-	Minus:         "-",
-	Plus:          "+",
-	Star:          "*",
-	Slash:         "/",
-	Percent:       "%",
-	And:           "&",
-	AndAnd:        "&&",
-	Or:            "|",
-	OrOr:          "||",
-	Caret:         "^",
-	Shl:           "<<",
-	Shr:           ">>",
 	MinusEq:       "-=",
 	PlusEq:        "+=",
 	StarEq:        "*=",
@@ -171,6 +155,25 @@ var tokenKindNames = [...]string{
 	CaretEq:       "^=",
 	ShlEq:         "<<=",
 	ShrEq:         ">>=",
+	EqEq:          "==",
+	NotEq:         "!=",
+	Lt:            "<",
+	LtEq:          "<=",
+	Gt:            ">",
+	GtEq:          ">=",
+	Minus:         "-",
+	Plus:          "+",
+	Star:          "*",
+	Slash:         "/",
+	Percent:       "%",
+	And:           "&",
+	Or:            "|",
+	Caret:         "^",
+	Shl:           "<<",
+	Shr:           ">>",
+	Not:           "!",
+	AndAnd:        "&&",
+	OrOr:          "||",
 	Break:         "break",
 	Const:         "const",
 	Continue:      "continue",
