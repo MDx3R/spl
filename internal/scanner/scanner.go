@@ -76,20 +76,39 @@ func (s *Scanner) Next() Token {
 		case ',':
 			return s.newToken(Comma)
 		case '.':
+			if s.match('.') {
+				return s.switchOp(DotDot, DotDotEq)
+			}
 			return s.newToken(Dot)
 		case ';':
 			return s.newToken(Semi)
 		case ':':
 			return s.newToken(Colon)
+		case '#':
+			return s.newToken(Pound)
+		case '?':
+			return s.newToken(Question)
 		case '=':
+			if s.match('>') {
+				return s.newToken(ThickArrow)
+			}
 			return s.switchOp(Eq, EqEq)
 		case '<':
+			if s.match('<') {
+				return s.switchOp(Shl, ShlEq)
+			}
 			return s.switchOp(Lt, LtEq)
 		case '>':
+			if s.match('>') {
+				return s.switchOp(Shr, ShrEq)
+			}
 			return s.switchOp(Gt, GtEq)
 		case '!':
 			return s.switchOp(Not, NotEq)
 		case '-':
+			if s.match('>') {
+				return s.newToken(ThinArrow)
+			}
 			return s.switchOp(Minus, MinusEq)
 		case '+':
 			return s.switchOp(Plus, PlusEq)

@@ -27,10 +27,16 @@ const (
 	Rbrace
 	Lbrack
 	Rbrack
+	ThinArrow
+	ThickArrow
 	Comma
 	Dot
+	DotDot
+	DotDotEq
 	Semi
 	Colon
+	Pound
+	Question
 
 	// operators
 	Eq
@@ -54,6 +60,9 @@ const (
 	OrOr
 	Caret
 
+	Shl
+	Shr
+
 	// assignments
 	MinusEq
 	PlusEq
@@ -64,6 +73,9 @@ const (
 	AndEq
 	OrEq
 	CaretEq
+
+	ShlEq
+	ShrEq
 
 	// keywords
 	Break
@@ -119,10 +131,16 @@ var tokenKindNames = [...]string{
 	Rbrace:        "}",
 	Lbrack:        "[",
 	Rbrack:        "]",
+	ThinArrow:     "->",
+	ThickArrow:    "=>",
 	Comma:         ",",
 	Dot:           ".",
+	DotDot:        "..",
+	DotDotEq:      "..=",
 	Semi:          ";",
 	Colon:         ":",
+	Pound:         "#",
+	Question:      "?",
 	Eq:            "=",
 	EqEq:          "==",
 	Lt:            "<",
@@ -141,6 +159,8 @@ var tokenKindNames = [...]string{
 	Or:            "|",
 	OrOr:          "||",
 	Caret:         "^",
+	Shl:           "<<",
+	Shr:           ">>",
 	MinusEq:       "-=",
 	PlusEq:        "+=",
 	StarEq:        "*=",
@@ -149,6 +169,8 @@ var tokenKindNames = [...]string{
 	AndEq:         "&=",
 	OrEq:          "|=",
 	CaretEq:       "^=",
+	ShlEq:         "<<=",
+	ShrEq:         ">>=",
 	Break:         "break",
 	Const:         "const",
 	Continue:      "continue",
