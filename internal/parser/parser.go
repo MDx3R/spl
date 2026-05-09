@@ -10,21 +10,50 @@ import (
 const MaxArgs = 65535
 
 var stmtStart = map[scanner.TokenKind]bool{
-	scanner.Break: true,
-	// TODO: add more statement start tokens
+	scanner.Break:    true,
+	scanner.Continue: true,
+	scanner.Return:   true,
+	scanner.Let:      true,
+	scanner.If:       true,
+	scanner.While:    true,
+	scanner.For:      true,
+	scanner.Loop:     true,
+	scanner.Lbrace:   true,
+	scanner.Semi:     true,
 }
 
 var declStart = map[scanner.TokenKind]bool{
-	scanner.Let: true,
-	// TODO: add more declaration start tokens
+	scanner.Let:    true,
+	scanner.Fn:     true,
+	scanner.Struct: true,
+	scanner.Trait:  true,
+	scanner.Impl:   true,
+	scanner.Pub:    true,
 }
-var exprStart = map[scanner.TokenKind]bool{
-	scanner.Lbrace: true,
-	// TODO: add more expression end tokens
+
+var paramRecover = map[scanner.TokenKind]bool{
+	scanner.Comma:  true,
+	scanner.Rparen: true,
+	scanner.Fn:     true,
+	scanner.Struct: true,
 }
-var exprEnd = map[scanner.TokenKind]bool{
-	scanner.Comma: true,
-	// TODO: add more expression end tokens
+
+var fieldRecover = map[scanner.TokenKind]bool{
+	scanner.Comma:  true,
+	scanner.Rbrace: true,
+	scanner.Fn:     true,
+	scanner.Struct: true,
+}
+
+var argRecover = map[scanner.TokenKind]bool{
+	scanner.Comma:  true,
+	scanner.Rparen: true,
+	scanner.Semi:   true,
+}
+
+var traitBodyRecover = map[scanner.TokenKind]bool{
+	scanner.Fn:     true,
+	scanner.Rbrace: true,
 }
 
 type Parser struct {
@@ -66,7 +95,7 @@ func (p *Parser) statement() Stmt {
 		return nil
 	}
 	if p.match(scanner.Fn) {
-		return p.funcDeclaration()
+		return p.funcDeclaration(Visibility{Kind: VisPrivate})
 	}
 	if p.match(scanner.Struct) {
 		return nil
@@ -93,71 +122,65 @@ func (p *Parser) statement() Stmt {
 }
 
 func (p *Parser) varDeclaration() Decl {
-	tok := p.current()
+	// fix: match optional "mut" first, then expect the name
+	mut := p.match(scanner.Mut)
+
+	nameTok := p.current()
 	if !p.expect(scanner.Name, "Expect variable name.") {
 		p.recover(stmtStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
-
-	mut := p.match(scanner.Mut)
+	name := nameTok.Lit
 
 	if !p.expect(scanner.Eq, "Expect '=' after variable name.") {
 		p.recover(stmtStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
 
 	value := p.expression()
 
 	if !p.expect(scanner.Semi, "Expect ';' after variable declaration.") {
 		p.recover(stmtStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
 
-	return VarDecl{Name: tok.Lit, Value: value, Mut: mut}
+	return VarDecl{Name: name, Value: value, Mut: mut}
 }
 
-func (p *Parser) funcDeclaration() Decl {
-	tok := p.current()
+func (p *Parser) funcDeclaration(vis Visibility) Decl {
+	nameTok := p.current()
 	if !p.expect(scanner.Name, "Expect function name.") {
 		p.recover(declStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
-
-	name := p.current().Lit
+	name := nameTok.Lit
 
 	if !p.expect(scanner.Lparen, "Expect '(' after function name.") {
 		p.recover(declStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
 
 	params := []Param{}
 	if !p.match(scanner.Rparen) {
 		for {
-			tok := p.current()
+			pNameTok := p.current()
 			if !p.expect(scanner.Name, "Expect parameter name.") {
-				p.recover(declStart)
-				return BadDecl{From: tok, To: p.current()}
+				p.recover(paramRecover)
+				return BadDecl{From: nameTok, To: p.current()}
 			}
-
-			pName := p.current().Lit
+			pName := pNameTok.Lit
 
 			if !p.expect(scanner.Colon, "Expect ':' after parameter name.") {
-				p.recover(declStart)
-				return BadDecl{From: tok, To: p.current()}
+				p.recover(paramRecover)
+				return BadDecl{From: nameTok, To: p.current()}
 			}
+
+			pTypeTok := p.current()
 			if !p.expect(scanner.Name, "Expect parameter type.") {
-				p.recover(declStart)
-				return BadDecl{From: tok, To: p.current()}
+				p.recover(paramRecover)
+				return BadDecl{From: nameTok, To: p.current()}
 			}
-
-			pType := p.expression()
-
-			_, isIdent := pType.(Ident)
-			if !isIdent {
-				p.errorf("Expect valid parameter type.")
-				p.recover(declStart)
-				return BadDecl{From: tok, To: p.current()}
-			}
+			pType := Ident{Name: pTypeTok.Lit}
 
 			params = append(params, Param{Name: pName, Type: pType})
 
@@ -165,21 +188,21 @@ func (p *Parser) funcDeclaration() Decl {
 				break
 			}
 		}
-	}
 
-	if !p.expect(scanner.Rparen, "Expect ')' after parameters.") {
-		p.recover(declStart)
-		return BadDecl{From: tok, To: p.current()}
+		if !p.expect(scanner.Rparen, "Expect ')' after parameters.") {
+			p.recover(declStart)
+			return BadDecl{From: nameTok, To: p.current()}
+		}
 	}
 
 	var returnType Expr
-	if p.match(scanner.ThinArrow) { // Arrow = '->'
+	if p.match(scanner.ThinArrow) {
 		returnType = p.expression()
 	}
 
 	if !p.expect(scanner.Lbrace, "Expect '{' before function body.") {
 		p.recover(declStart)
-		return BadDecl{From: tok, To: p.current()}
+		return BadDecl{From: nameTok, To: p.current()}
 	}
 
 	body := p.block()
@@ -189,7 +212,7 @@ func (p *Parser) funcDeclaration() Decl {
 		Params:     params,
 		ReturnType: returnType,
 		Body:       body.(BlockExpr),
-		Visibility: Visibility{Kind: VisPrivate},
+		Visibility: vis,
 	}
 }
 
@@ -217,7 +240,7 @@ func (p *Parser) expression() Expr {
 		return nil
 	}
 	if p.match(scanner.Return) {
-		return nil
+		return ReturnExpr{}
 	}
 	if p.match(scanner.Break) {
 		return nil
@@ -231,9 +254,13 @@ func (p *Parser) block() Expr {
 	stmts := []Stmt{}
 
 	tok := p.current()
-	for !p.match(scanner.Rbrace) {
-		// TODO: support tail expressions
+	for !p.match(scanner.Rbrace) && !p.isAtEnd() {
+		start := p.current()
 		stmts = append(stmts, p.statement())
+		// safety: prevent infinite loop if no progress was made
+		if p.current() == start {
+			p.consume()
+		}
 	}
 
 	if p.isAtEnd() {
@@ -247,16 +274,16 @@ func (p *Parser) block() Expr {
 func (p *Parser) assignment() Expr {
 	expr := p.equality()
 
+	op := p.current()
 	if p.match(scanner.Eq) {
-		equals := p.current()
 		value := p.assignment()
 
 		if val, ok := expr.(Ident); ok {
 			return AssignExpr{Name: val.Name, Value: value}
 		}
 
-		p.errh(equals, "Invalid assignment target.")
-		return BadExpr{From: equals, To: p.current()}
+		p.errh(op, "Invalid assignment target.")
+		return BadExpr{From: op, To: p.current()}
 	}
 
 	return expr
@@ -265,8 +292,9 @@ func (p *Parser) assignment() Expr {
 func (p *Parser) equality() Expr {
 	expr := p.comparison()
 
+	op := p.current()
 	if p.matchMany(scanner.EqEq, scanner.NotEq) {
-		return BinaryExpr{Left: expr, Op: p.current(), Right: p.comparison()}
+		return BinaryExpr{Left: expr, Op: op, Right: p.comparison()}
 	}
 
 	return expr
@@ -275,8 +303,9 @@ func (p *Parser) equality() Expr {
 func (p *Parser) comparison() Expr {
 	expr := p.term()
 
+	op := p.current()
 	if p.matchMany(scanner.Gt, scanner.Lt, scanner.GtEq, scanner.LtEq) {
-		return BinaryExpr{Left: expr, Op: p.current(), Right: p.term()}
+		return BinaryExpr{Left: expr, Op: op, Right: p.term()}
 	}
 
 	return expr
@@ -285,8 +314,9 @@ func (p *Parser) comparison() Expr {
 func (p *Parser) term() Expr {
 	expr := p.factor()
 
+	op := p.current()
 	if p.matchMany(scanner.Plus, scanner.Minus) {
-		return BinaryExpr{Left: expr, Op: p.current(), Right: p.factor()}
+		return BinaryExpr{Left: expr, Op: op, Right: p.factor()}
 	}
 
 	return expr
@@ -295,16 +325,18 @@ func (p *Parser) term() Expr {
 func (p *Parser) factor() Expr {
 	expr := p.unary()
 
+	op := p.current()
 	if p.matchMany(scanner.Star, scanner.Slash, scanner.Percent, scanner.Caret) {
-		return BinaryExpr{Left: expr, Op: p.current(), Right: p.unary()}
+		return BinaryExpr{Left: expr, Op: op, Right: p.unary()}
 	}
 
 	return expr
 }
 
 func (p *Parser) unary() Expr {
+	op := p.current()
 	if p.matchMany(scanner.Not, scanner.Minus) {
-		return UnaryExpr{Op: p.current(), Right: p.unary()}
+		return UnaryExpr{Op: op, Right: p.unary()}
 	}
 
 	return p.call()
@@ -353,12 +385,14 @@ func (p *Parser) primary() Expr {
 	if p.match(scanner.True) {
 		return LiteralExpr{Value: true}
 	}
+
+	tok := p.current()
 	if p.matchMany(scanner.IntLit, scanner.FloatLit, scanner.StrLit, scanner.CharLit) {
-		return LiteralExpr{Value: p.current().Lit}
+		return LiteralExpr{Value: tok.Lit}
 	}
 
 	if p.match(scanner.Name) {
-		return Ident{Name: p.current().Lit}
+		return Ident{Name: tok.Lit}
 	}
 
 	if p.match(scanner.Lparen) {
