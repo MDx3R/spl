@@ -31,6 +31,7 @@ var keywords = map[string]TokenKind{
 	"type":     Type,
 	"use":      Use,
 	"while":    While,
+	"union":    Union,
 }
 
 func LookupKeyword(ident string) (TokenKind, bool) {

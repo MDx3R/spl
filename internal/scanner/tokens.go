@@ -111,6 +111,7 @@ const (
 	Type
 	Use
 	While
+	Union
 
 	Invalid
 )
@@ -204,6 +205,7 @@ var tokenKindNames = [...]string{
 	Type:          "type",
 	Use:           "use",
 	While:         "while",
+	Union:         "union",
 	Invalid:       "Invalid",
 }
 

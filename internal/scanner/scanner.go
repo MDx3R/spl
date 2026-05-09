@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,13 +17,11 @@ type Scanner struct {
 	tokLine, tokCol uint
 }
 
-func NewScanner(src io.Reader) *Scanner {
+func NewScanner(src io.Reader, errh func(line, col uint, msg string)) *Scanner {
 	s := &Scanner{
 		buf:  bufio.NewReader(src),
 		line: 1,
-	}
-	s.errh = func(line, col uint, msg string) {
-		fmt.Fprintf(os.Stderr, "%d:%d: %s\n", line, col, msg)
+		errh: errh,
 	}
 	// TODO: uncomment when scanner client (parser) is implemented
 	// s.consume()
