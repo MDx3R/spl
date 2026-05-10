@@ -137,13 +137,13 @@ func (p *Parser) parseType() Expr {
 	}
 
 	if p.match(scanner.SelfUpper) {
-		return Ident{Name: "Self"}
+		return Ident{Name: "Self", Pos: tok}
 	}
 	if p.match(scanner.SelfLower) {
-		return Ident{Name: "self"}
+		return Ident{Name: "self", Pos: tok}
 	}
 	if p.match(scanner.Name) {
-		return Ident{Name: tok.Lit}
+		return Ident{Name: tok.Lit, Pos: tok}
 	}
 	if p.match(scanner.Lbrack) {
 		inner := p.parseType()
@@ -276,7 +276,7 @@ func (p *Parser) varDeclaration() Decl {
 		return BadDecl{From: nameTok, To: p.current()}
 	}
 
-	return VarDecl{Name: name, Type: typ, Value: value, Mut: mut}
+	return VarDecl{Name: name, Type: typ, Value: value, Mut: mut, Pos: nameTok}
 }
 
 func (p *Parser) funcDeclaration(vis Visibility) Decl {
@@ -315,6 +315,7 @@ func (p *Parser) funcDeclaration(vis Visibility) Decl {
 		ReturnType: returnType,
 		Body:       body,
 		Visibility: vis,
+		Pos:        nameTok,
 	}
 }
 
@@ -328,10 +329,11 @@ func (p *Parser) parseFuncParams() ([]Param, bool) {
 	}
 
 	for {
+		startTok := p.current()
 		switch {
 		case p.match(scanner.SelfLower):
 			// bare self
-			params = append(params, Param{Name: "self"})
+			params = append(params, Param{Name: "self", Pos: startTok})
 
 		case p.match(scanner.And):
 			// &self or &mut self
@@ -340,7 +342,7 @@ func (p *Parser) parseFuncParams() ([]Param, bool) {
 				p.recover(paramRecover)
 				return params, false
 			}
-			params = append(params, Param{Name: "self", Ref: true, Mut: mut})
+			params = append(params, Param{Name: "self", Ref: true, Mut: mut, Pos: startTok})
 
 		default:
 			pNameTok := p.current()
@@ -353,7 +355,7 @@ func (p *Parser) parseFuncParams() ([]Param, bool) {
 				return params, false
 			}
 			pType := p.parseType()
-			params = append(params, Param{Name: pNameTok.Lit, Type: pType})
+			params = append(params, Param{Name: pNameTok.Lit, Type: pType, Pos: pNameTok})
 		}
 
 		if !p.match(scanner.Comma) {
@@ -432,7 +434,7 @@ func (p *Parser) structDeclaration(vis Visibility) Decl {
 		return BadDecl{From: nameTok, To: p.current()}
 	}
 
-	return StructDecl{Name: nameTok.Lit, Fields: fields, Visibility: vis}
+	return StructDecl{Name: nameTok.Lit, Fields: fields, Visibility: vis, Pos: nameTok}
 }
 
 func (p *Parser) traitDeclaration(vis Visibility) Decl {
@@ -483,7 +485,7 @@ func (p *Parser) traitDeclaration(vis Visibility) Decl {
 		return BadDecl{From: nameTok, To: p.current()}
 	}
 
-	return TraitDecl{Name: nameTok.Lit, Methods: methods, Visibility: vis}
+	return TraitDecl{Name: nameTok.Lit, Methods: methods, Visibility: vis, Pos: nameTok}
 }
 
 func (p *Parser) implDeclaration() Decl {
@@ -540,7 +542,7 @@ func (p *Parser) implDeclaration() Decl {
 		return BadDecl{From: tok, To: p.current()}
 	}
 
-	return ImplDecl{Trait: traitName, Type: typeName, Methods: methods}
+	return ImplDecl{Trait: traitName, Type: typeName, Methods: methods, Pos: tok}
 }
 
 func (p *Parser) isExprWithBlock(e Expr) bool {
@@ -832,15 +834,15 @@ func (p *Parser) finishCall(fun Expr) Expr {
 
 func (p *Parser) primary() Expr {
 	if p.match(scanner.False) {
-		return LiteralExpr{Value: false}
+		return LiteralExpr{Kind: scanner.False, Value: false}
 	}
 	if p.match(scanner.True) {
-		return LiteralExpr{Value: true}
+		return LiteralExpr{Kind: scanner.True, Value: true}
 	}
 
 	tok := p.current()
 	if p.matchMany(scanner.IntLit, scanner.FloatLit, scanner.StrLit, scanner.CharLit) {
-		return LiteralExpr{Value: tok.Lit}
+		return LiteralExpr{Kind: tok.Kind, Value: tok.Lit, Pos: tok}
 	}
 
 	// Name or macro invocation (name!)

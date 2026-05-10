@@ -37,6 +37,7 @@ type (
 
 	Ident struct {
 		Name string
+		Pos  scanner.Token
 	}
 
 	BinaryExpr struct {
@@ -55,7 +56,9 @@ type (
 	}
 
 	LiteralExpr struct {
+		Kind  scanner.TokenKind
 		Value any
+		Pos   scanner.Token
 	}
 
 	AssignExpr struct {
@@ -200,6 +203,7 @@ type Param struct {
 	Type Expr // nil for bare self / &self
 	Ref  bool // true for &self and &mut self
 	Mut  bool // true for mut self and &mut self
+	Pos  scanner.Token
 }
 
 // FuncSignature is a function declaration without a body (used in trait declarations).
@@ -235,6 +239,7 @@ type (
 		Type  Expr // nil when no type annotation
 		Value Expr
 		Mut   bool
+		Pos   scanner.Token
 	}
 
 	FuncDecl struct {
@@ -246,24 +251,28 @@ type (
 		IsUnsafe   bool
 		Const      bool
 		Visibility Visibility
+		Pos        scanner.Token
 	}
 
 	StructDecl struct {
 		Name       string
 		Fields     []FieldDef
 		Visibility Visibility
+		Pos        scanner.Token
 	}
 
 	TraitDecl struct {
 		Name       string
 		Methods    []TraitMethod
 		Visibility Visibility
+		Pos        scanner.Token
 	}
 
 	ImplDecl struct {
 		Trait   string // "" for an inherent impl
 		Type    string
 		Methods []FuncDecl
+		Pos     scanner.Token
 	}
 )
 
