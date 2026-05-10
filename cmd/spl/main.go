@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/MDx3R/spl/internal/app/spl"
-	"github.com/MDx3R/spl/internal/scanner"
 )
 
 func main() {
@@ -23,40 +22,28 @@ func main() {
 	}
 
 	var buf bytes.Buffer
-	app := spl.NewApp(&buf)
+	application := spl.NewApp(&buf)
 
-	cleaned, warnings, err := app.Cleaner.Clean(string(data))
+	cleaned, warnings, err := application.Cleaner.Clean(string(data))
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("--------------------------------")
-	fmt.Println(cleaned)
-	fmt.Println("--------------------------------")
-
 	for _, w := range warnings {
-		fmt.Printf("%s\n", w)
-		return
+		fmt.Printf("Warning: %s\n", w)
 	}
 
 	buf.WriteString(cleaned)
-	app.Scanner.Init()
 
-	var tokens []scanner.Token
-	for {
-		t := app.Scanner.Next()
-		if t.Kind == scanner.EOF {
-			break
-		}
-		tokens = append(tokens, t)
+	file := application.Parse()
+	if file == nil {
+		fmt.Println("Parse returned nil")
+		os.Exit(1)
 	}
 
-	for _, t := range tokens {
-		fmt.Println(t)
+	fmt.Printf("Parsed %d top-level declaration(s):\n", len(file.Decls))
+	for i, d := range file.Decls {
+		fmt.Printf("  [%d] %T\n", i, d)
 	}
-
-	fmt.Println("--------------------------------")
-	fmt.Println("No lexical errors")
-	fmt.Println("--------------------------------")
 }

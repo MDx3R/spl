@@ -221,3 +221,7 @@ type Token struct {
 	Lit       string
 	Line, Col uint
 }
+
+func (t Token) IsComment() bool {
+	return (t.Kind >= LineComment && t.Kind <= InnerBlockDoc)
+}

@@ -31,6 +31,17 @@ var declStart = map[scanner.TokenKind]bool{
 	scanner.Pub:    true,
 }
 
+// itemStart is the recovery set for top-level declarations only.
+// Deliberately excludes Let (valid only inside blocks) to avoid
+// stopping recover() at a token topLevelDecl() cannot handle.
+var itemStart = map[scanner.TokenKind]bool{
+	scanner.Fn:     true,
+	scanner.Struct: true,
+	scanner.Trait:  true,
+	scanner.Impl:   true,
+	scanner.Pub:    true,
+}
+
 var paramRecover = map[scanner.TokenKind]bool{
 	scanner.Comma:  true,
 	scanner.Rparen: true,
@@ -70,7 +81,53 @@ func (p *Parser) Parse() *File {
 	p.scanner.Init()
 	p.tok = p.scanner.Next()
 
-	return nil
+	var decls []Decl
+	for !p.isAtEnd() {
+		start := p.current()
+		decls = append(decls, p.topLevelDecl())
+		// safety: prevent infinite loop if topLevelDecl made no progress
+		if !p.isAtEnd() && p.current() == start {
+			p.consume()
+		}
+	}
+	return &File{Decls: decls}
+}
+
+func (p *Parser) parseVisibility() Visibility {
+	if p.match(scanner.Pub) {
+		return Visibility{Kind: VisPublic}
+	}
+	return Visibility{Kind: VisPrivate}
+}
+
+func (p *Parser) topLevelDecl() Decl {
+	for p.current().IsComment() {
+		p.consume()
+	}
+
+	vis := p.parseVisibility()
+
+	tok := p.current()
+	switch {
+	case p.match(scanner.Fn):
+		return p.funcDeclaration(vis)
+	case p.match(scanner.Struct):
+		// stub -- implemented later
+		p.recover(declStart)
+		return BadDecl{From: tok, To: p.current()}
+	case p.match(scanner.Trait):
+		// stub -- implemented later
+		p.recover(declStart)
+		return BadDecl{From: tok, To: p.current()}
+	case p.match(scanner.Impl):
+		// stub -- implemented later
+		p.recover(declStart)
+		return BadDecl{From: tok, To: p.current()}
+	default:
+		p.errorf("Expected top-level declaration (fn, struct, trait, impl).")
+		p.recover(itemStart)
+		return BadDecl{From: tok, To: p.current()}
+	}
 }
 
 func (p *Parser) errorf(format string, args ...any) {
