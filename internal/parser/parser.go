@@ -85,9 +85,10 @@ var compoundAssignOps = []scanner.TokenKind{
 
 // Parser holds the scanning cursor and error handler.
 type Parser struct {
-	scanner *scanner.Scanner
-	tok     scanner.Token
-	errh    func(tok scanner.Token, msg string)
+	scanner     *scanner.Scanner
+	tok         scanner.Token
+	errh        func(tok scanner.Token, msg string)
+	noStructLit bool
 }
 
 func NewParser(sc *scanner.Scanner, errh func(tok scanner.Token, msg string)) *Parser {
@@ -123,6 +124,33 @@ func (p *Parser) parseVisibility() Visibility {
 
 func (p *Parser) errorf(format string, args ...any) {
 	p.errh(p.tok, fmt.Sprintf(format, args...))
+}
+
+// withNoStructLit temporarily sets the noStructLit flag to true, calls fn,
+// then restores the flag to its previous value. Used for parsing
+// conditions where struct literals would be ambiguous with block bodies.
+func (p *Parser) withNoStructLit(fn func() Expr) Expr {
+	old := p.noStructLit
+	p.noStructLit = true
+	e := fn()
+	p.noStructLit = old
+	return e
+}
+
+// Identical to withNoStructLit, but instead temporarily sets the noStructLit flag to false.
+func (p *Parser) withStructLit(fn func() Expr) Expr {
+	old := p.noStructLit
+	p.noStructLit = false
+	e := fn()
+	p.noStructLit = old
+	return e
+}
+
+// isTypePath checks if an expression can be a type path for struct literals.
+// For now, only simple identifiers (can extend for module paths later).
+func isTypePath(e Expr) bool {
+	_, ok := e.(Ident)
+	return ok
 }
 
 // parseType parses a simple type expression: Ident, Self, &Type, &mut Type, [Type].
@@ -799,6 +827,11 @@ func (p *Parser) postfix() Expr {
 			expr = FieldExpr{Obj: expr, Field: nameTok.Lit}
 
 		default:
+			if ident, ok := expr.(Ident); ok && !p.noStructLit && p.check(scanner.Lbrace) && isTypePath(expr) {
+				p.consume() // eat '{'
+				expr = p.structLitBody(ident)
+			}
+
 			return expr
 		}
 	}
@@ -809,7 +842,7 @@ func (p *Parser) finishCall(fun Expr) Expr {
 	args := []Expr{}
 
 	if !p.match(scanner.Rparen) {
-		for {
+		for !p.isAtEnd() && !p.check(scanner.Rparen) {
 			if len(args) >= MaxArgs {
 				p.errorf("Can't have more than %d arguments.", MaxArgs)
 				p.recover(argRecover)
@@ -820,16 +853,64 @@ func (p *Parser) finishCall(fun Expr) Expr {
 			if !p.match(scanner.Comma) {
 				break
 			}
-			if p.current().Kind == scanner.Rparen {
-				break // trailing comma
-			}
 		}
+
 		if !p.expect(scanner.Rparen, "Expect ')' after arguments.") {
 			return BadExpr{From: tok, To: p.current()}
 		}
 	}
 
 	return CallExpr{Fun: fun, Args: args}
+}
+
+// structLitBody parses the body of a struct literal: fields and optional struct update.
+// The opening '{' has already been consumed.
+// name is an Ident expression representing the struct type name.
+func (p *Parser) structLitBody(name Ident) Expr {
+	nameTok := p.current() // approximate location
+
+	fields := []StructLitField{}
+	var spread Expr
+
+	for !p.isAtEnd() && !p.check(scanner.Rbrace) {
+		// Check for struct update: ..expr
+		if p.match(scanner.DotDot) {
+			spread = p.or()
+			// struct update must be last
+			// optional comma
+			p.match(scanner.Comma)
+			break
+		}
+
+		// Expect field name
+		fieldTok := p.current()
+		if !p.expect(scanner.Name, "Expect field name in struct literal.") {
+			p.recover(fieldRecover)
+			continue
+		}
+		fieldName := fieldTok.Lit
+
+		var value Expr
+		// Check for shorthand (field without : expr)
+		if p.match(scanner.Colon) {
+			value = p.or()
+		} else {
+			// Shorthand: use fieldName as the value expression
+			value = nil
+		}
+
+		fields = append(fields, StructLitField{Name: fieldName, Value: value})
+
+		if !p.match(scanner.Comma) {
+			break
+		}
+	}
+
+	if !p.expect(scanner.Rbrace, "Expect '}' after struct literal body.") {
+		return BadExpr{From: nameTok, To: p.current()}
+	}
+
+	return StructLitExpr{Name: name.Name, Fields: fields, Spread: spread}
 }
 
 func (p *Parser) primary() Expr {
@@ -863,12 +944,12 @@ func (p *Parser) primary() Expr {
 
 	// Array literal: [expr, expr, ...]
 	if p.match(scanner.Lbrack) {
-		return p.arrayExpr()
+		return p.withStructLit(func() Expr { return p.arrayExpr() })
 	}
 
 	// Grouped expression: (expr)
 	if p.match(scanner.Lparen) {
-		expr := p.expression()
+		expr := p.withStructLit(func() Expr { return p.expression() })
 		if !p.expect(scanner.Rparen, "Expect ')' after group expression.") {
 			return BadExpr{From: tok, To: p.current()}
 		}
@@ -877,7 +958,7 @@ func (p *Parser) primary() Expr {
 
 	// Block expression: { stmts... }
 	if p.match(scanner.Lbrace) {
-		return p.block()
+		return p.withStructLit(func() Expr { return p.block() })
 	}
 
 	if p.match(scanner.If) {
@@ -900,7 +981,7 @@ func (p *Parser) primary() Expr {
 func (p *Parser) ifExpr() Expr {
 	tok := p.current()
 
-	cond := p.expression()
+	cond := p.withNoStructLit(func() Expr { return p.expression() })
 
 	if !p.expect(scanner.Lbrace, "Expect '{' after if condition.") {
 		p.recover(stmtStart)
@@ -927,7 +1008,7 @@ func (p *Parser) ifExpr() Expr {
 func (p *Parser) whileExpr() Expr {
 	tok := p.current()
 
-	cond := p.expression()
+	cond := p.withNoStructLit(func() Expr { return p.expression() })
 
 	if !p.expect(scanner.Lbrace, "Expect '{' after while condition.") {
 		p.recover(stmtStart)
@@ -952,7 +1033,7 @@ func (p *Parser) forExpr() Expr {
 		return BadExpr{From: tok, To: p.current()}
 	}
 
-	iter := p.expression()
+	iter := p.withNoStructLit(func() Expr { return p.expression() })
 
 	if !p.expect(scanner.Lbrace, "Expect '{' after for iterator.") {
 		p.recover(stmtStart)

@@ -15,6 +15,7 @@ type Visitor interface {
 	VisitFieldExpr(e FieldExpr)
 	VisitIndexExpr(e IndexExpr)
 	VisitArrayExpr(e ArrayExpr)
+	VisitStructLitExpr(e StructLitExpr)
 	VisitRangeExpr(e RangeExpr)
 	VisitIfExpr(e IfExpr)
 	VisitWhileExpr(e WhileExpr)
@@ -75,6 +76,7 @@ func (e CallExpr) Accept(v Visitor)           { v.VisitCallExpr(e) }
 func (e FieldExpr) Accept(v Visitor)          { v.VisitFieldExpr(e) }
 func (e IndexExpr) Accept(v Visitor)          { v.VisitIndexExpr(e) }
 func (e ArrayExpr) Accept(v Visitor)          { v.VisitArrayExpr(e) }
+func (e StructLitExpr) Accept(v Visitor)      { v.VisitStructLitExpr(e) }
 func (e RangeExpr) Accept(v Visitor)          { v.VisitRangeExpr(e) }
 func (e IfExpr) Accept(v Visitor)             { v.VisitIfExpr(e) }
 func (e WhileExpr) Accept(v Visitor)          { v.VisitWhileExpr(e) }

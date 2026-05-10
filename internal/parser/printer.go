@@ -245,6 +245,24 @@ func (pr *AstPrinter) VisitArrayExpr(e ArrayExpr) {
 	})
 }
 
+func (pr *AstPrinter) VisitStructLitExpr(e StructLitExpr) {
+	pr.write("StructLitExpr %q", e.Name)
+	pr.indent(func() {
+		for _, f := range e.Fields {
+			if f.Value == nil {
+				pr.write("field %q: (shorthand)", f.Name)
+			} else {
+				pr.write("field %q:", f.Name)
+				pr.indent(func() { VisitExpr(pr, f.Value) })
+			}
+		}
+		if e.Spread != nil {
+			pr.write("spread:")
+			pr.indent(func() { VisitExpr(pr, e.Spread) })
+		}
+	})
+}
+
 func (pr *AstPrinter) VisitRangeExpr(e RangeExpr) {
 	op := ".."
 	if e.Inclusive {

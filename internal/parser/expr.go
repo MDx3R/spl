@@ -133,6 +133,13 @@ type (
 		Elems []Expr
 	}
 
+	// Point { x: 1, y: 2 } or Point { x, y } or Point { x: 1, ..other }
+	StructLitExpr struct {
+		Name   string // type name
+		Fields []StructLitField
+		Spread Expr // ..expr for struct update, or nil
+	}
+
 	BreakExpr struct {
 		Value Expr // may be nil
 	}
@@ -143,6 +150,12 @@ type (
 		Expr Expr // may be nil
 	}
 )
+
+// StructLitField is a field in a struct literal: name: expr or shorthand name.
+type StructLitField struct {
+	Name  string
+	Value Expr // nil for shorthand (Name used as both field and value)
+}
 
 func (e BadExpr) exprNode()            {}
 func (e Ident) exprNode()              {}
@@ -163,6 +176,7 @@ func (e LoopExpr) exprNode()           {}
 func (e RangeExpr) exprNode()          {}
 func (e MacroExpr) exprNode()          {}
 func (e ArrayExpr) exprNode()          {}
+func (e StructLitExpr) exprNode()      {}
 func (e BreakExpr) exprNode()          {}
 func (e ContinueExpr) exprNode()       {}
 func (e ReturnExpr) exprNode()         {}
@@ -194,35 +208,6 @@ const (
 
 type Visibility struct {
 	Kind VisibilityKind
-}
-
-// Param is a function parameter.
-// For self parameters: Name is "self"; Ref indicates & prefix; Mut indicates mut.
-type Param struct {
-	Name string
-	Type Expr // nil for bare self / &self
-	Ref  bool // true for &self and &mut self
-	Mut  bool // true for mut self and &mut self
-	Pos  scanner.Token
-}
-
-// FuncSignature is a function declaration without a body (used in trait declarations).
-type FuncSignature struct {
-	Name       string
-	Params     []Param
-	ReturnType Expr // nil when no return type is specified
-}
-
-// TraitMethod is either abstract (Body == nil) or has a default implementation.
-type TraitMethod struct {
-	Sig  FuncSignature
-	Body *BlockExpr // nil = abstract
-}
-
-// FieldDef is a field in a struct declaration: name: Type
-type FieldDef struct {
-	Name string
-	Type Expr
 }
 
 type (
@@ -275,6 +260,35 @@ type (
 		Pos     scanner.Token
 	}
 )
+
+// Param is a function parameter.
+// For self parameters: Name is "self"; Ref indicates & prefix; Mut indicates mut.
+type Param struct {
+	Name string
+	Type Expr // nil for bare self / &self
+	Ref  bool // true for &self and &mut self
+	Mut  bool // true for mut self and &mut self
+	Pos  scanner.Token
+}
+
+// FuncSignature is a function declaration without a body (used in trait declarations).
+type FuncSignature struct {
+	Name       string
+	Params     []Param
+	ReturnType Expr // nil when no return type is specified
+}
+
+// TraitMethod is either abstract (Body == nil) or has a default implementation.
+type TraitMethod struct {
+	Sig  FuncSignature
+	Body *BlockExpr // nil = abstract
+}
+
+// FieldDef is a field in a struct declaration: name: Type
+type FieldDef struct {
+	Name string
+	Type Expr
+}
 
 func (d BadDecl) stmtNode()    {}
 func (d BadDecl) declNode()    {}
