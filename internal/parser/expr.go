@@ -70,6 +70,16 @@ type (
 		Args []Expr
 	}
 
+	FieldExpr struct {
+		Obj   Expr
+		Field string
+	}
+
+	IndexExpr struct {
+		Obj   Expr
+		Index Expr
+	}
+
 	ReturnExpr struct {
 		Expr Expr
 	}
@@ -84,6 +94,8 @@ func (e LiteralExpr) exprNode()  {}
 func (e AssignExpr) exprNode()   {}
 func (e BlockExpr) exprNode()    {}
 func (e CallExpr) exprNode()     {}
+func (e FieldExpr) exprNode()    {}
+func (e IndexExpr) exprNode()    {}
 func (e ReturnExpr) exprNode()   {}
 
 type (

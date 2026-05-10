@@ -329,7 +329,7 @@ func (p *Parser) block() Expr {
 }
 
 func (p *Parser) assignment() Expr {
-	expr := p.equality()
+	expr := p.or()
 
 	op := p.current()
 	if p.match(scanner.Eq) {
@@ -346,34 +346,75 @@ func (p *Parser) assignment() Expr {
 	return expr
 }
 
+func (p *Parser) or() Expr {
+	expr := p.and()
+
+	for {
+		op := p.current()
+		if !p.match(scanner.OrOr) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.and()}
+	}
+
+	return expr
+}
+
+func (p *Parser) and() Expr {
+	expr := p.equality()
+
+	for {
+		op := p.current()
+		if !p.match(scanner.AndAnd) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.equality()}
+	}
+
+	return expr
+}
+
 func (p *Parser) equality() Expr {
 	expr := p.comparison()
 
-	op := p.current()
-	if p.matchMany(scanner.EqEq, scanner.NotEq) {
-		return BinaryExpr{Left: expr, Op: op, Right: p.comparison()}
+	for {
+		op := p.current()
+		if !p.matchMany(scanner.EqEq, scanner.NotEq) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.comparison()}
 	}
 
 	return expr
 }
 
 func (p *Parser) comparison() Expr {
-	expr := p.term()
+	expr := p.rangeExpr()
 
-	op := p.current()
-	if p.matchMany(scanner.Gt, scanner.Lt, scanner.GtEq, scanner.LtEq) {
-		return BinaryExpr{Left: expr, Op: op, Right: p.term()}
+	for {
+		op := p.current()
+		if !p.matchMany(scanner.Gt, scanner.Lt, scanner.GtEq, scanner.LtEq) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.rangeExpr()}
 	}
 
 	return expr
 }
 
+func (p *Parser) rangeExpr() Expr {
+	return p.term()
+}
+
 func (p *Parser) term() Expr {
 	expr := p.factor()
 
-	op := p.current()
-	if p.matchMany(scanner.Plus, scanner.Minus) {
-		return BinaryExpr{Left: expr, Op: op, Right: p.factor()}
+	for {
+		op := p.current()
+		if !p.matchMany(scanner.Plus, scanner.Minus) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.factor()}
 	}
 
 	return expr
@@ -382,9 +423,12 @@ func (p *Parser) term() Expr {
 func (p *Parser) factor() Expr {
 	expr := p.unary()
 
-	op := p.current()
-	if p.matchMany(scanner.Star, scanner.Slash, scanner.Percent, scanner.Caret) {
-		return BinaryExpr{Left: expr, Op: op, Right: p.unary()}
+	for {
+		op := p.current()
+		if !p.matchMany(scanner.Star, scanner.Slash, scanner.Percent, scanner.Caret) {
+			break
+		}
+		expr = BinaryExpr{Left: expr, Op: op, Right: p.unary()}
 	}
 
 	return expr
@@ -396,25 +440,45 @@ func (p *Parser) unary() Expr {
 		return UnaryExpr{Op: op, Right: p.unary()}
 	}
 
-	return p.call()
+	return p.postfix()
 }
 
-func (p *Parser) call() Expr {
+func (p *Parser) postfix() Expr {
 	expr := p.primary()
 
-	for p.match(scanner.Lparen) {
-		expr = p.callWithArgs(expr)
+	for {
+		switch {
+		case p.match(scanner.Lparen):
+			expr = p.finishCall(expr)
+		case p.match(scanner.Lbrack):
+			idx := p.expression()
+			if !p.expect(scanner.Rbrack, "Expect ']' after index expression.") {
+				return BadExpr{From: p.current(), To: p.current()}
+			}
+			expr = IndexExpr{Obj: expr, Index: idx}
+		case p.match(scanner.Dot):
+			nameTok := p.current()
+			if !p.expect(scanner.Name, "Expect field or method name after '.'.") {
+				return BadExpr{From: p.current(), To: p.current()}
+			}
+			expr = FieldExpr{Obj: expr, Field: nameTok.Lit}
+		default:
+			return expr
+		}
 	}
-
-	return expr
 }
 
-func (p *Parser) callWithArgs(fun Expr) Expr {
+func (p *Parser) finishCall(fun Expr) Expr {
 	tok := p.current()
 	args := []Expr{}
 
 	if !p.match(scanner.Rparen) {
 		for {
+			if len(args) >= MaxArgs {
+				p.errorf("Can't have more than %d arguments.", MaxArgs)
+				p.recover(argRecover)
+				return BadExpr{From: tok, To: p.current()}
+			}
 			args = append(args, p.expression())
 
 			if !p.match(scanner.Comma) {
@@ -423,13 +487,8 @@ func (p *Parser) callWithArgs(fun Expr) Expr {
 		}
 	}
 
-	if len(args) > MaxArgs {
-		p.errorf("Can't have more than %d arguments.", MaxArgs)
-		return BadExpr{From: tok, To: p.current()}
-	}
-
 	if !p.expect(scanner.Rparen, "Expect ')' after arguments.") {
-		return BadExpr{From: p.current(), To: p.current()}
+		return BadExpr{From: tok, To: p.current()}
 	}
 
 	return CallExpr{Fun: fun, Args: args}
