@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/MDx3R/spl/internal/app/spl"
+	"github.com/MDx3R/spl/internal/parser"
 )
 
 func main() {
@@ -42,8 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Parsed %d top-level declaration(s):\n", len(file.Decls))
-	for i, d := range file.Decls {
-		fmt.Printf("  [%d] %T\n", i, d)
-	}
+	pr := parser.NewAstPrinter()
+	pr.VisitFile(file)
+	fmt.Print(pr.String())
 }

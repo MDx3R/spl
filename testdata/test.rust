@@ -17,7 +17,7 @@
 **/
 fn main() {
     // This is a standard one-line comment
-    let mut x = 10;
+    let mut x = call();
     let emoji = "emoji"; // This is valid
 
     /*

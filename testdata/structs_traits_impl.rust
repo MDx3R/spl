@@ -1,0 +1,73 @@
+/// A simple 2D point.
+pub struct Point {
+    x: i32,
+    y: i32,
+}
+
+/// A shape that can be drawn.
+pub trait Drawable {
+    fn draw(&self);
+    fn area(&self) -> f64;
+}
+
+/// A trait with a default implementation.
+pub trait Describable {
+    fn describe(&self) -> i32;
+    fn label(&self) -> i32 {
+        42
+    }
+}
+
+/// Inherent impl with self parameters and field assignment.
+impl Point {
+    pub fn new(x: i32, y: i32) -> Self {
+        x
+    }
+
+    pub fn distance(&self) -> f64 {
+        let dx = self.x;
+        let dy = self.y;
+        dx + dy
+    }
+
+    fn translate(&mut self, dx: i32, dy: i32) {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
+    }
+}
+
+/// Trait impl.
+impl Drawable for Point {
+    fn draw(&self) {
+        println!("Drawing point");
+    }
+
+    fn area(&self) -> f64 {
+        0
+    }
+}
+
+/// Top-level function exercising various expressions.
+fn run() {
+    let dx = 3;
+    let dy = 4;
+    let sum = dx + dy;
+
+    let result = if sum > 0 {
+        sum
+    } else {
+        0
+    };
+
+    for i in 0..10 {
+        println!("i = {}", i);
+    }
+
+    let bits = 1 | 2 ^ 3 & 4;
+    let shifted = bits << 2;
+    let back = shifted >> 1;
+    let neg = !back;
+
+    let r = 1..=5;
+    println!("result = {}", result);
+}
