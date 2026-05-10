@@ -41,6 +41,10 @@ func (pr *AstPrinter) VisitBadDecl(d BadDecl) {
 	pr.write("BadDecl [%d:%d .. %d:%d]", d.From.Line, d.From.Col, d.To.Line, d.To.Col)
 }
 
+func (pr *AstPrinter) VisitEmptyDecl(d EmptyDecl) {
+	pr.write("EmptyDecl [%d:%d]", d.Tok.Line, d.Tok.Col)
+}
+
 func (pr *AstPrinter) VisitVarDecl(d VarDecl) {
 	mut := ""
 	if d.Mut {
@@ -138,6 +142,10 @@ func (pr *AstPrinter) VisitBadStmt(s BadStmt) {
 func (pr *AstPrinter) VisitExprStmt(s ExprStmt) {
 	pr.write("ExprStmt")
 	pr.indent(func() { VisitExpr(pr, s.Expr) })
+}
+
+func (pr *AstPrinter) VisitEmptyStmt(s EmptyStmt) {
+	pr.write("EmptyStmt [%d:%d]", s.Tok.Line, s.Tok.Col)
 }
 
 // Expressions

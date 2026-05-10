@@ -36,11 +36,11 @@ var declStart = map[scanner.TokenKind]bool{
 // itemStart is the recovery set for the top-level declaration loop.
 // Excludes Let which is only valid inside blocks.
 var itemStart = map[scanner.TokenKind]bool{
+	scanner.Pub:    true,
 	scanner.Fn:     true,
 	scanner.Struct: true,
 	scanner.Trait:  true,
 	scanner.Impl:   true,
-	scanner.Pub:    true,
 }
 
 var paramRecover = map[scanner.TokenKind]bool{
@@ -100,8 +100,13 @@ func (p *Parser) Parse() *File {
 
 	var decls []Decl
 	for !p.isAtEnd() {
+		for p.current().IsComment() {
+			p.consume()
+		}
+
 		start := p.current()
-		decls = append(decls, p.topLevelDecl())
+		decls = append(decls, p.item())
+
 		if !p.isAtEnd() && p.current() == start {
 			p.consume()
 		}
@@ -114,28 +119,6 @@ func (p *Parser) parseVisibility() Visibility {
 		return Visibility{Kind: VisPublic}
 	}
 	return Visibility{Kind: VisPrivate}
-}
-
-func (p *Parser) topLevelDecl() Decl {
-	for p.current().IsComment() {
-		p.consume()
-	}
-	vis := p.parseVisibility()
-	tok := p.current()
-	switch {
-	case p.match(scanner.Fn):
-		return p.funcDeclaration(vis)
-	case p.match(scanner.Struct):
-		return p.structDeclaration(vis)
-	case p.match(scanner.Trait):
-		return p.traitDeclaration(vis)
-	case p.match(scanner.Impl):
-		return p.implDeclaration()
-	default:
-		p.errorf("Expected top-level declaration (fn, struct, trait, impl).")
-		p.recover(itemStart)
-		return BadDecl{From: tok, To: p.current()}
-	}
 }
 
 func (p *Parser) errorf(format string, args ...any) {
@@ -171,6 +154,101 @@ func (p *Parser) parseType() Expr {
 	p.errorf("Expect type.")
 	return BadExpr{From: tok, To: p.current()}
 }
+
+// ---
+
+func (p *Parser) statementOrNil() Stmt {
+	tok := p.current()
+	if p.match(scanner.Semi) {
+		return EmptyStmt{Tok: tok}
+	}
+
+	if p.match(scanner.Let) {
+		return p.varDeclaration()
+	}
+
+	if p.isAtItemStart() {
+		return p.item()
+	}
+
+	return nil
+}
+
+func (p *Parser) isAtItemStart() bool {
+	return itemStart[p.current().Kind]
+}
+
+func (p *Parser) item() Decl {
+	vis := p.parseVisibility()
+
+	tok := p.current()
+	switch {
+	case p.match(scanner.Semi):
+		return EmptyDecl{Tok: tok}
+	case p.match(scanner.Fn):
+		return p.funcDeclaration(vis)
+	case p.match(scanner.Struct):
+		return p.structDeclaration(vis)
+	case p.match(scanner.Trait):
+		return p.traitDeclaration(vis)
+	case p.match(scanner.Impl):
+		return p.implDeclaration()
+	default:
+		p.errorf("Expected item declaration (fn, struct, trait, impl).")
+		p.recover(itemStart)
+		return BadDecl{From: tok, To: p.current()}
+	}
+}
+
+func (p *Parser) finishExprStatement(expr Expr) Stmt {
+	if p.isExprWithBlock(expr) {
+		p.match(scanner.Semi)
+	} else {
+		if !p.expect(scanner.Semi, "Expect ';' after expression.") {
+			p.recover(stmtStart)
+		}
+	}
+	return ExprStmt{Expr: expr}
+}
+
+func (p *Parser) block() BlockExpr {
+	var stmts []Stmt
+	var tail Expr
+
+	for !p.check(scanner.Rbrace) && !p.isAtEnd() {
+		for p.current().IsComment() {
+			p.consume()
+		}
+		if p.check(scanner.Rbrace) {
+			break
+		}
+
+		if stmt := p.statementOrNil(); stmt != nil {
+			stmts = append(stmts, stmt)
+			continue
+		}
+
+		start := p.current()
+		expr := p.expression()
+
+		if p.check(scanner.Rbrace) {
+			tail = expr
+			break
+		}
+
+		stmts = append(stmts, p.finishExprStatement(expr))
+
+		// Safety: prevent infinite loop if no token was consumed.
+		if !p.isAtEnd() && p.current() == start {
+			p.consume()
+		}
+	}
+
+	p.expect(scanner.Rbrace, "Expect '}' after block.")
+	return BlockExpr{Stmts: stmts, Tail: tail}
+}
+
+// ---
 
 func (p *Parser) varDeclaration() Decl {
 	mut := p.match(scanner.Mut)
@@ -251,14 +329,12 @@ func (p *Parser) parseFuncParams() ([]Param, bool) {
 
 	for {
 		switch {
-		case p.current().Kind == scanner.SelfLower:
+		case p.match(scanner.SelfLower):
 			// bare self
-			p.consume()
 			params = append(params, Param{Name: "self"})
 
-		case p.current().Kind == scanner.And:
+		case p.match(scanner.And):
 			// &self or &mut self
-			p.consume()
 			mut := p.match(scanner.Mut)
 			if !p.expect(scanner.SelfLower, "Expect 'self' after '&' in parameter list.") {
 				p.recover(paramRecover)
@@ -283,8 +359,10 @@ func (p *Parser) parseFuncParams() ([]Param, bool) {
 		if !p.match(scanner.Comma) {
 			break
 		}
-		if p.current().Kind == scanner.Rparen {
-			break // trailing comma
+
+		// trailing comma
+		if p.check(scanner.Rparen) {
+			break
 		}
 	}
 
@@ -330,21 +408,15 @@ func (p *Parser) structDeclaration(vis Visibility) Decl {
 	}
 
 	fields := []FieldDef{}
-	for !p.isAtEnd() && p.current().Kind != scanner.Rbrace {
+	for !p.isAtEnd() && !p.check(scanner.Rbrace) {
 		fieldTok := p.current()
 		if !p.expect(scanner.Name, "Expect field name.") {
 			p.recover(fieldRecover)
-			if p.current().Kind == scanner.Rbrace {
-				break
-			}
 			continue
 		}
 
 		if !p.expect(scanner.Colon, "Expect ':' after field name.") {
 			p.recover(fieldRecover)
-			if p.current().Kind == scanner.Rbrace {
-				break
-			}
 			continue
 		}
 
@@ -376,19 +448,16 @@ func (p *Parser) traitDeclaration(vis Visibility) Decl {
 	}
 
 	methods := []TraitMethod{}
-	for !p.isAtEnd() && p.current().Kind != scanner.Rbrace {
+	for !p.isAtEnd() && !p.check(scanner.Rbrace) {
 		for p.current().IsComment() {
 			p.consume()
 		}
-		if p.current().Kind == scanner.Rbrace {
+		if p.check(scanner.Rbrace) {
 			break
 		}
 
 		if !p.expect(scanner.Fn, "Expect 'fn' in trait body.") {
 			p.recover(traitBodyRecover)
-			if p.current().Kind == scanner.Rbrace {
-				break
-			}
 			continue
 		}
 
@@ -447,20 +516,17 @@ func (p *Parser) implDeclaration() Decl {
 	}
 
 	methods := []FuncDecl{}
-	for !p.isAtEnd() && p.current().Kind != scanner.Rbrace {
+	for !p.isAtEnd() && !p.check(scanner.Rbrace) {
 		for p.current().IsComment() {
 			p.consume()
 		}
-		if p.current().Kind == scanner.Rbrace {
+		if p.check(scanner.Rbrace) {
 			break
 		}
 
 		vis := p.parseVisibility()
 		if !p.expect(scanner.Fn, "Expect 'fn' in impl body.") {
 			p.recover(traitBodyRecover)
-			if p.current().Kind == scanner.Rbrace {
-				break
-			}
 			continue
 		}
 
@@ -475,86 +541,6 @@ func (p *Parser) implDeclaration() Decl {
 	}
 
 	return ImplDecl{Trait: traitName, Type: typeName, Methods: methods}
-}
-
-// block parses a block body after the opening '{' has already been consumed.
-// It returns BlockExpr directly; errors are reported via errh and parsing continues.
-func (p *Parser) block() BlockExpr {
-	var stmts []Stmt
-	var tail Expr
-
-	for !p.isAtEnd() {
-		// skip doc-comment tokens and empty semicolons
-		if p.current().IsComment() {
-			p.consume()
-			continue
-		}
-		if p.match(scanner.Semi) {
-			continue
-		}
-
-		if p.current().Kind == scanner.Rbrace {
-			p.consume()
-			return BlockExpr{Stmts: stmts, Tail: tail}
-		}
-
-		start := p.current()
-
-		switch p.current().Kind {
-		case scanner.Let:
-			p.consume()
-			stmts = append(stmts, p.varDeclaration())
-
-		case scanner.Fn:
-			p.consume()
-			stmts = append(stmts, p.funcDeclaration(Visibility{Kind: VisPrivate}))
-
-		// Do I even need this here? default clause is going to fail on this regardless
-		case scanner.Const, scanner.Type, scanner.Mod, scanner.Use,
-			scanner.Struct, scanner.Enum, scanner.Union, scanner.Static,
-			scanner.Trait, scanner.Impl, scanner.Extern:
-			p.errorf("'%s' is not yet supported inside blocks.", p.current().Kind)
-			p.consume()
-			p.recover(stmtStart)
-			stmts = append(stmts, BadStmt{From: start, To: p.current()})
-
-		// TODO: refactor
-		default:
-			// Expression - could be a regular statement or the block's tail value.
-			expr := p.expression()
-
-			if p.isExprWithBlock(expr) {
-				// ExpressionWithBlock: trailing ; is optional.
-				if p.current().Kind == scanner.Rbrace {
-					// No semicolon before }: treat as tail.
-					tail = expr
-					p.consume()
-					return BlockExpr{Stmts: stmts, Tail: tail}
-				}
-				p.match(scanner.Semi)
-				stmts = append(stmts, ExprStmt{Expr: expr})
-			} else if p.current().Kind == scanner.Rbrace {
-				// Non-block expr with no semicolon before }: tail expression.
-				tail = expr
-				p.consume()
-				return BlockExpr{Stmts: stmts, Tail: tail}
-			} else if p.match(scanner.Semi) {
-				stmts = append(stmts, ExprStmt{Expr: expr})
-			} else {
-				p.errorf("Expect ';' after expression.")
-				p.recover(stmtStart)
-				stmts = append(stmts, ExprStmt{Expr: expr})
-			}
-		}
-
-		// Safety: prevent infinite loop if no token was consumed.
-		if !p.isAtEnd() && p.current() == start {
-			p.consume()
-		}
-	}
-
-	p.errorf("Expect '}' after block.")
-	return BlockExpr{Stmts: stmts, Tail: tail}
 }
 
 func (p *Parser) isExprWithBlock(e Expr) bool {
@@ -641,27 +627,32 @@ func (p *Parser) assignment() Expr {
 }
 
 func (p *Parser) rangeExpr() Expr {
+	var op scanner.Token
+
 	// Open-ended left: ..hi or ..=hi
-	if p.current().Kind == scanner.DotDot || p.current().Kind == scanner.DotDotEq {
-		op := p.current()
+	op = p.current()
+	if p.matchMany(scanner.DotDot, scanner.DotDotEq) {
 		inclusive := op.Kind == scanner.DotDotEq
-		p.consume()
+
 		var hi Expr
 		if !p.isAtEnd() && !rangeTerminators[p.current().Kind] {
 			hi = p.or()
 		}
+
 		return RangeExpr{Lo: nil, Hi: hi, Inclusive: inclusive}
 	}
 
 	lo := p.or()
 
-	op := p.current()
-	if op.Kind == scanner.DotDot || op.Kind == scanner.DotDotEq {
+	op = p.current()
+	// lo..hi or lo..=hi
+	if p.matchMany(scanner.DotDot, scanner.DotDotEq) {
 		inclusive := op.Kind == scanner.DotDotEq
-		p.consume()
+
 		if p.isAtEnd() || rangeTerminators[p.current().Kind] {
 			return RangeExpr{Lo: lo, Hi: nil, Inclusive: inclusive}
 		}
+
 		hi := p.or()
 		return RangeExpr{Lo: lo, Hi: hi, Inclusive: inclusive}
 	}
@@ -904,8 +895,6 @@ func (p *Parser) primary() Expr {
 	return BadExpr{From: tok, To: p.current()}
 }
 
-// ─── control-flow expressions ─────────────────────────────────────────────────
-
 func (p *Parser) ifExpr() Expr {
 	tok := p.current()
 
@@ -984,8 +973,6 @@ func (p *Parser) loopExpr() Expr {
 	return LoopExpr{Body: body}
 }
 
-// ─── helper expressions ───────────────────────────────────────────────────────
-
 // macroExpr parses ident!(args...) -- name and '!' already consumed.
 func (p *Parser) macroExpr(name string) Expr {
 	tok := p.current()
@@ -1001,7 +988,7 @@ func (p *Parser) macroExpr(name string) Expr {
 			if !p.match(scanner.Comma) {
 				break
 			}
-			if p.current().Kind == scanner.Rparen {
+			if p.check(scanner.Rparen) {
 				break
 			}
 		}
@@ -1024,7 +1011,7 @@ func (p *Parser) arrayExpr() Expr {
 			if !p.match(scanner.Comma) {
 				break
 			}
-			if p.current().Kind == scanner.Rbrack {
+			if p.check(scanner.Rbrack) {
 				break // trailing comma
 			}
 		}
@@ -1036,8 +1023,6 @@ func (p *Parser) arrayExpr() Expr {
 	return ArrayExpr{Elems: elems}
 }
 
-// ─── scanner interface ────────────────────────────────────────────────────────
-
 func (p *Parser) isAtEnd() bool          { return p.tok.Kind == scanner.EOF }
 func (p *Parser) current() scanner.Token { return p.tok }
 
@@ -1046,10 +1031,17 @@ func (p *Parser) matchMany(kinds ...scanner.TokenKind) bool {
 }
 
 func (p *Parser) match(kind scanner.TokenKind) bool {
-	if p.isAtEnd() || p.current().Kind != kind {
+	if !p.check(kind) {
 		return false
 	}
 	p.consume()
+	return true
+}
+
+func (p *Parser) check(kind scanner.TokenKind) bool {
+	if p.isAtEnd() || p.current().Kind != kind {
+		return false
+	}
 	return true
 }
 

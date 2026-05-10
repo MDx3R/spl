@@ -28,9 +28,11 @@ type Visitor interface {
 	// Statements
 	VisitBadStmt(s BadStmt)
 	VisitExprStmt(s ExprStmt)
+	VisitEmptyStmt(s EmptyStmt)
 
 	// Declarations
 	VisitBadDecl(d BadDecl)
+	VisitEmptyDecl(d EmptyDecl)
 	VisitVarDecl(d VarDecl)
 	VisitFuncDecl(d FuncDecl)
 	VisitStructDecl(d StructDecl)
@@ -84,11 +86,13 @@ func (e ContinueExpr) Accept(v Visitor)       { v.VisitContinueExpr(e) }
 func (e ReturnExpr) Accept(v Visitor)         { v.VisitReturnExpr(e) }
 
 // Statements
-func (s BadStmt) Accept(v Visitor)  { v.VisitBadStmt(s) }
-func (s ExprStmt) Accept(v Visitor) { v.VisitExprStmt(s) }
+func (s BadStmt) Accept(v Visitor)   { v.VisitBadStmt(s) }
+func (s ExprStmt) Accept(v Visitor)  { v.VisitExprStmt(s) }
+func (s EmptyStmt) Accept(v Visitor) { v.VisitEmptyStmt(s) }
 
 // Declarations
 func (d BadDecl) Accept(v Visitor)    { v.VisitBadDecl(d) }
+func (d EmptyDecl) Accept(v Visitor)  { v.VisitEmptyDecl(d) }
 func (d VarDecl) Accept(v Visitor)    { v.VisitVarDecl(d) }
 func (d FuncDecl) Accept(v Visitor)   { v.VisitFuncDecl(d) }
 func (d StructDecl) Accept(v Visitor) { v.VisitStructDecl(d) }

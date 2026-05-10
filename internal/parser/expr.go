@@ -172,10 +172,15 @@ type (
 	ExprStmt struct {
 		Expr Expr
 	}
+
+	EmptyStmt struct {
+		Tok scanner.Token
+	}
 )
 
-func (s BadStmt) stmtNode()  {}
-func (s ExprStmt) stmtNode() {}
+func (s BadStmt) stmtNode()   {}
+func (s ExprStmt) stmtNode()  {}
+func (s EmptyStmt) stmtNode() {}
 
 type VisibilityKind uint
 
@@ -221,6 +226,10 @@ type (
 		From, To scanner.Token
 	}
 
+	EmptyDecl struct {
+		Tok scanner.Token
+	}
+
 	VarDecl struct {
 		Name  string
 		Type  Expr // nil when no type annotation
@@ -260,6 +269,8 @@ type (
 
 func (d BadDecl) stmtNode()    {}
 func (d BadDecl) declNode()    {}
+func (d EmptyDecl) stmtNode()  {}
+func (d EmptyDecl) declNode()  {}
 func (d VarDecl) stmtNode()    {}
 func (d VarDecl) declNode()    {}
 func (d FuncDecl) stmtNode()   {}
