@@ -146,13 +146,6 @@ func (p *Parser) withStructLit(fn func() Expr) Expr {
 	return e
 }
 
-// isTypePath checks if an expression can be a type path for struct literals.
-// For now, only simple identifiers (can extend for module paths later).
-func isTypePath(e Expr) bool {
-	_, ok := e.(Ident)
-	return ok
-}
-
 // parseType parses a simple type expression: Ident, Self, &Type, &mut Type, [Type].
 func (p *Parser) parseType() Expr {
 	tok := p.current()
@@ -827,7 +820,7 @@ func (p *Parser) postfix() Expr {
 			expr = FieldExpr{Obj: expr, Field: nameTok.Lit}
 
 		default:
-			if ident, ok := expr.(Ident); ok && !p.noStructLit && p.check(scanner.Lbrace) && isTypePath(expr) {
+			if ident, ok := expr.(Ident); ok && !p.noStructLit && p.check(scanner.Lbrace) {
 				p.consume() // eat '{'
 				expr = p.structLitBody(ident)
 			}
