@@ -1,0 +1,238 @@
+﻿File (2 decl(s))
+  FuncDecl "main"
+    body:
+      VarDecl mut "x"
+        value:
+          CallExpr
+            fun:
+              Ident "call"
+      VarDecl "emoji"
+        value:
+          Literal emoji
+      VarDecl "y"
+        value:
+          Literal 5
+      VarDecl "sum"
+        value:
+          BinaryExpr +
+            Ident "x"
+            Ident "y"
+      VarDecl "difference"
+        value:
+          BinaryExpr -
+            Ident "x"
+            Ident "y"
+      VarDecl "product"
+        value:
+          BinaryExpr *
+            Ident "x"
+            Ident "y"
+      VarDecl "division"
+        value:
+          BinaryExpr /
+            Ident "x"
+            Ident "y"
+      ExprStmt
+        MacroExpr println!
+          Literal sum = {}, difference = {}, product = {}, division = {}
+          Ident "sum"
+          Ident "difference"
+          Ident "product"
+          Ident "division"
+      VarDecl "is_greater"
+        value:
+          BinaryExpr &&
+            BinaryExpr >
+              Ident "x"
+              Ident "y"
+            BinaryExpr >
+              Ident "y"
+              Literal 0
+      ExprStmt
+        MacroExpr println!
+          Literal Is x greater than y and y > 0? {}
+          Ident "is_greater"
+      ExprStmt
+        IfExpr
+          cond:
+            Ident "is_greater"
+          then:
+            ExprStmt
+              MacroExpr println!
+                Literal x is greater than y
+          else:
+            BlockExpr
+              ExprStmt
+                MacroExpr println!
+                  Literal x is NOT greater than y
+      ExprStmt
+        MacroExpr println!
+          Literal For loop:
+      ExprStmt
+        ForExpr "i"
+          iter:
+            RangeExpr ..
+              lo:
+                Literal 0
+              hi:
+                Literal 5
+          body:
+            ExprStmt
+              MacroExpr println!
+                Literal i = {}
+                Ident "i"
+      ExprStmt
+        MacroExpr println!
+          Literal While loop:
+      VarDecl mut "counter"
+        value:
+          Literal 0
+      ExprStmt
+        WhileExpr
+          cond:
+            BinaryExpr <
+              Ident "counter"
+              Literal 3
+          body:
+            ExprStmt
+              MacroExpr println!
+                Literal counter = {}
+                Ident "counter"
+            ExprStmt
+              CompoundAssignExpr +=
+                target:
+                  Ident "counter"
+                value:
+                  Literal 1
+      VarDecl "factorial_result"
+        value:
+          CallExpr
+            fun:
+              Ident "factorial"
+            args:
+              Literal 5
+      ExprStmt
+        MacroExpr println!
+          Literal Factorial of 5 = {}
+          Ident "factorial_result"
+      VarDecl "even_check"
+        value:
+          CallExpr
+            fun:
+              Ident "is_even"
+            args:
+              Ident "x"
+      ExprStmt
+        MacroExpr println!
+          Literal Is x even? {}
+          Ident "even_check"
+      ExprStmt
+        MacroExpr println!
+          Literal "x" = {}, "emoji" = {}
+          Ident "x"
+          Ident "emoji"
+      ExprStmt
+        AssignExpr
+          target:
+            Ident "x"
+          value:
+            Literal 20
+      ExprStmt
+        MacroExpr println!
+          Literal New value of x = {}
+          Ident "x"
+  EmptyDecl [51:2]
+Symbol Table:
+Name                 | Type     | Mut   | Init  | Scope
+-------------------------------------------------------
+main                 | fn       | false | true  | global
+x                    | unknown  | true  | true  | main
+emoji                | string   | false | true  | main
+y                    | i32      | false | true  | main
+sum                  | i32      | false | true  | main
+difference           | i32      | false | true  | main
+product              | i32      | false | true  | main
+division             | i32      | false | true  | main
+is_greater           | bool     | false | true  | main
+i                    | i32      | false | true  | for
+counter              | i32      | true  | true  | main
+factorial_result     | unknown  | false | true  | main
+even_check           | unknown  | false | true  | main
+Semantic Analysis:
+  undeclared: identifier 'call' is not declared
+  undeclared: identifier 'factorial' is not declared
+  undeclared: identifier 'is_even' is not declared
+Intermediate Representation (Triads):
+ 1) (call, call, 0)
+ 2) (:=, x, ^1)
+ 3) (:=, emoji, "emoji")
+ 4) (:=, y, 5)
+ 5) (+, x, y)
+ 6) (:=, sum, ^5)
+ 7) (-, x, y)
+ 8) (:=, difference, ^7)
+ 9) (*, x, y)
+10) (:=, product, ^9)
+11) (/, x, y)
+12) (:=, division, ^11)
+13) (param, "sum = {}, difference = {}, product = {}, division = {}", -)
+14) (param, sum, -)
+15) (param, difference, -)
+16) (param, product, -)
+17) (param, division, -)
+18) (call, println!, 5)
+19) (>, x, y)
+20) (>, y, 0)
+21) (&&, ^19, ^20)
+22) (:=, is_greater, ^21)
+23) (param, "Is x greater than y and y > 0? {}", -)
+24) (param, is_greater, -)
+25) (call, println!, 2)
+26) (if_false, is_greater, ^30)
+27) (param, "x is greater than y", -)
+28) (call, println!, 1)
+29) (goto, -, ^32)
+30) (param, "x is NOT greater than y", -)
+31) (call, println!, 1)
+32) (param, "For loop:", -)
+33) (call, println!, 1)
+34) (:=, i, 0)
+35) (<, i, 5)
+36) (if_false, ^35, ^43)
+37) (param, "i = {}", -)
+38) (param, i, -)
+39) (call, println!, 2)
+40) (+, i, 1)
+41) (:=, i, ^40)
+42) (goto, -, ^35)
+43) (param, "While loop:", -)
+44) (call, println!, 1)
+45) (:=, counter, 0)
+46) (<, counter, 3)
+47) (if_false, ^46, ^54)
+48) (param, "counter = {}", -)
+49) (param, counter, -)
+50) (call, println!, 2)
+51) (+, counter, 1)
+52) (:=, counter, ^51)
+53) (goto, -, ^46)
+54) (param, 5, -)
+55) (call, factorial, 1)
+56) (:=, factorial_result, ^55)
+57) (param, "Factorial of 5 = {}", -)
+58) (param, factorial_result, -)
+59) (call, println!, 2)
+60) (param, x, -)
+61) (call, is_even, 1)
+62) (:=, even_check, ^61)
+63) (param, "Is x even? {}", -)
+64) (param, even_check, -)
+65) (call, println!, 2)
+66) (param, ""x" = {}, "emoji" = {}", -)
+67) (param, x, -)
+68) (param, emoji, -)
+69) (call, println!, 3)
+70) (:=, x, 20)
+71) (param, "New value of x = {}", -)
+72) (param, x, -)
+73) (call, println!, 2)

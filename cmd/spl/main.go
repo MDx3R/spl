@@ -7,6 +7,7 @@ import (
 
 	"github.com/MDx3R/spl/internal/app/spl"
 	"github.com/MDx3R/spl/internal/parser"
+	"github.com/MDx3R/spl/internal/semantic"
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 
 	buf.WriteString(cleaned)
 
+	// LR3: parse → AST
 	file := application.Parse()
 	if file == nil {
 		fmt.Println("Parse returned nil")
@@ -46,4 +48,15 @@ func main() {
 	pr := parser.NewAstPrinter()
 	pr.VisitFile(file)
 	fmt.Print(pr.String())
+
+	// LR4: semantic analysis → symbol table + errors
+	analyzer := semantic.NewAnalyzer()
+	analyzer.AnalyzeFile(file)
+	fmt.Print(analyzer.FormatTable())
+	fmt.Print(analyzer.FormatErrors())
+
+	// LR4: triad IR generation (consumes the analysis result)
+	emitter := semantic.NewTriadEmitter()
+	emitter.EmitFile(file, analyzer.Result())
+	fmt.Print(emitter.String())
 }

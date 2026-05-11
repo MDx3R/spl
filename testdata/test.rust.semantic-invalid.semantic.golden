@@ -1,0 +1,17 @@
+Symbol Table:
+Name                 | Type     | Mut   | Init  | Scope
+-------------------------------------------------------
+main                 | fn() -> unit | false | true  | global
+x                    | i32      | false | true  | main
+z                    | i32      | false | true  | main
+Semantic Analysis:
+  duplicate: identifier 'x' is already declared in this scope
+  undeclared: identifier 'y' is not declared
+  immutable_assign: cannot assign to immutable variable 'x'
+  type_mismatch: type mismatch in declaration of 'z': annotation is i32 but initializer is string
+Intermediate Representation (Triads):
+ 1) (:=, x, 5)
+ 2) (:=, x, 10)
+ 3) (:=, y, 3)
+ 4) (:=, x, 7)
+ 5) (:=, z, "hello")

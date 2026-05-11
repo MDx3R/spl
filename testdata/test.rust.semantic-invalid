@@ -1,0 +1,7 @@
+fn main() {
+    let x = 5;
+    let x = 10;
+    y = 3;
+    x = 7;
+    let z: i32 = "hello";
+}

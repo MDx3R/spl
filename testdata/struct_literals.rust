@@ -1,0 +1,79 @@
+/// Test struct literal parsing with basic init, shorthand, struct update, and ambiguity restrictions.
+
+pub struct Point {
+    x: i32,
+    y: i32,
+}
+
+pub struct Config {
+    name: str,
+    value: i32,
+}
+
+fn test_basic() {
+    // Basic struct literal
+    let p = Point { x: 1, y: 2 };
+    
+    // Trailing comma allowed
+    let p2 = Point { x: 10, y: 20, };
+    
+    // Empty struct (if defined)
+    let c = Config { name: "test", value: 42 };
+}
+
+fn test_shorthand() {
+    let x = 5;
+    let y = 10;
+    
+    // Field init shorthand: x and y used as both field name and value
+    let p = Point { x, y };
+    
+    // Mix shorthand and explicit
+    let p2 = Point { x: 1, y };
+}
+
+fn test_struct_update() {
+    let p1 = Point { x: 1, y: 2 };
+    
+    // Struct update syntax: ..p1 for remaining fields
+    let p2 = Point { x: 99, ..p1 };
+    
+    let p3 = Point { y: 100, ..p1 };
+}
+
+fn test_restriction_if() {
+    let MyStruct = 1; // just a variable
+    
+    // This should parse: { break; } is the if block body, not a struct literal
+    if MyStruct { break; }
+    
+    // Parens lift the restriction, this should parse as struct literal
+    if (Point { x: 1, y: 2 }).x > 0 { }
+}
+
+fn test_restriction_while() {
+    let active = true;
+    
+    // Block body, not struct literal
+    while active { break; }
+}
+
+fn test_restriction_for() {
+    let arr = 0..5;
+    
+    // Block body, not struct literal
+    for i in arr { break; }
+    
+    // Parens lift restriction
+    for i in (Point { x: 1, y: 2 }).x..5 { break; }
+}
+
+fn test_in_brackets() {
+    // Struct literals allowed in array
+    let points = [Point { x: 1, y: 2 }, Point { x: 3, y: 4 }];
+    
+    // Struct literals allowed in block
+    let p = {
+        Point { x: 5, y: 6 }
+    };
+}

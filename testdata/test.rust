@@ -71,4 +71,4 @@ fn main() {
     // Assigning a new value
     x = 20;
     println!("New value of x = {}", x);
-}
+};
